@@ -3,7 +3,7 @@ src = open('/home/hatch/workspace/tsum-app/index.html', encoding='utf-8').read()
 import re
 ver = re.search(r"'Tsum v(\d+)'", src).group(1)
 s = src
-s = s.replace('<title>ツムツム</title>', '<title>ツムツム</title>\n<script src="https://sdk.minepi.com/pi-sdk.js"></script>', 1)
+s = s.replace('<title>つむP</title>', '<title>つむP</title>\n<script src="https://sdk.minepi.com/pi-sdk.js"></script>', 1)
 s = s.replace("'Tsum v" + ver + "'", "'Tsum Pi Test v" + ver + "'", 1)
 s = s.replace("const GIFTS_ENABLED = false;", "const GIFTS_ENABLED = true;", 1)
 old_id = """  // ---------------- player identity (browser build: local id) ----------------
@@ -56,5 +56,7 @@ gate = """
 </script>
 </body>"""
 s = s.replace('</body>', gate, 1)
+assert 'pi-sdk.js' in s, 'Pi SDK injection failed - title string mismatch?'
+assert 'Pi.authenticate' in s, 'Pi gate block missing'
 open('/home/hatch/workspace/tsum-app-pi-test/index.html', 'w', encoding='utf-8').write(s)
 print('pi build regenerated, v' + ver)
