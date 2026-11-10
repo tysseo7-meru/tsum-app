@@ -24,10 +24,10 @@ s = s.replace("document.getElementById('userLine').textContent = 'プレイヤ�
 s = s.replace('<button class="btn" id="startBtn">スタート</button>', '<button class="btn" id="startBtn" disabled>スタート</button>', 1)
 gate = """
 <style>
-  #pi-gate { position: fixed; inset: 0; z-index: 60; background: rgba(60,16,36,.93); color: #fff;
+  #pi-gate { position: fixed; inset: 0; z-index: 60; background: rgba(8,28,58,.94); color: #fff;
              display: none; flex-direction: column; align-items: center; justify-content: center;
              gap: 16px; padding: 24px; text-align: center; font-family: inherit; }
-  #pi-gate a { color: #ffd9e8; font-weight: 700; }
+  #pi-gate a { color: #cfe8ff; font-weight: 700; }
 </style>
 <div id="pi-gate">
   <p>このブラウザではサインインできません。<br>Piブラウザで開いてください。</p>
