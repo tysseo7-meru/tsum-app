@@ -41,7 +41,30 @@
   #gameScreen { justify-content: flex-start; gap: 8px; padding-top: 10px; }
   #hud { width: min(94vw, 430px); display: flex; flex-direction: column; gap: 4px; }
   #hudRow { display: flex; justify-content: space-between; align-items: baseline; font-weight: 800; }
-  #scoreBox { font-size: 24px; color: #e75480; }
+  #scoreBox { font-size: 19px; color: #fff; background: linear-gradient(180deg, #4658d8, #1c2a7a);
+              border: 2px solid #9fd8ff; border-radius: 999px; padding: 4px 16px; min-width: 104px; text-align: center;
+              box-shadow: inset 0 2px 3px rgba(255,255,255,.45); }
+  #coinBox { font-size: 16px !important; color: #fff !important; background: linear-gradient(180deg, #4658d8, #1c2a7a);
+             border: 2px solid #9fd8ff; border-radius: 999px; padding: 5px 14px; min-width: 92px; text-align: center;
+             box-shadow: inset 0 2px 3px rgba(255,255,255,.45); }
+  #pauseBtn { width: 44px; height: 44px; border-radius: 50%; border: 2px solid #ffb300; cursor: pointer;
+              background: linear-gradient(180deg, #ffd54f, #ff8f00); font-size: 17px; color: #5d3a00; flex: none; }
+  #underRow { width: min(94vw, 430px); display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+  .roundBtn { width: 66px; height: 66px; border-radius: 50%; border: 3px solid #fff; cursor: pointer; position: relative;
+              display: flex; align-items: center; justify-content: center; padding: 0; }
+  .roundBtn:disabled { filter: grayscale(.5) brightness(.75); cursor: default; }
+  #skillBtn { background: conic-gradient(#ffd93b 0deg, #ffd93b 0deg, #fff8e1 0deg); box-shadow: 0 3px 8px rgba(0,0,0,.3); }
+  #skillBtn.ready { animation: pulse .7s ease-in-out infinite alternate; border-color: #ffb300; }
+  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.1); } }
+  #skillBtn .in { width: 52px; height: 52px; border-radius: 50%; background: #fff8e1; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  #skillBtn .in svg { width: 88%; height: 88%; }
+  #fanBtn { background: linear-gradient(180deg, #ffb74d, #f57c00); box-shadow: 0 3px 8px rgba(0,0,0,.3); }
+  #fanBtn .cnt { position: absolute; bottom: -4px; right: -4px; background: #e75480; color: #fff; font-size: 12px; font-weight: 800;
+                 border-radius: 999px; padding: 1px 7px; border: 2px solid #fff; }
+  .btnLabel { font-size: 11px; color: #cfc4f5; text-align: center; margin-top: 3px; font-weight: 700; }
+  #pauseOverlay { position: absolute; inset: 0; z-index: 8; display: none; align-items: center; justify-content: center;
+                  background: rgba(20,10,50,.55); color: #fff; font-size: 24px; font-weight: 800; border-radius: 38px; }
+  #pauseOverlay.on { display: flex; }
   #comboBox { font-size: 15px; color: #f39c12; font-weight: 800; min-height: 1.1em; }
   #coinBox { font-size: 19px; color: #b8860b; }
   #timeSec { background: #fff; border: 3px solid #7ec8f7; color: #1c6ea4; border-radius: 50%;
@@ -137,6 +160,7 @@
       <div id="scoreBox">0</div>
       <div id="timeSec">60</div>
       <div id="coinBox">🪙 0</div>
+      <button id="pauseBtn">⏸</button>
     </div>
     <div id="timeBarWrap"><div id="timeBar"></div></div>
     <div id="feverRow">
@@ -145,8 +169,12 @@
       <div id="comboBox"></div>
     </div>
   </div>
-  <div id="fieldWrap"><div id="field"><canvas id="chainCanvas"></canvas></div></div>
-  <p class="note">ゆびでなぞって、はなすと消えます</p>
+  <div id="fieldWrap"><div id="field"><canvas id="chainCanvas"></canvas><div id="pauseOverlay">⏸ 一時停止中</div></div></div>
+  <div id="underRow">
+    <div><button class="roundBtn" id="skillBtn"><span class="in" id="skillIn"></span></button><div class="btnLabel">スキル</div></div>
+    <p class="note">ゆびでなぞって、<br>はなすと消えます</p>
+    <div><button class="roundBtn" id="fanBtn"><svg viewBox="0 0 100 100" width="40" height="40"><g fill="#fff"><path d="M50 50 L50 12 A38 38 0 0 1 74 24 Z"/><path d="M50 50 L88 50 A38 38 0 0 1 76 74 Z"/><path d="M50 50 L50 88 A38 38 0 0 1 26 76 Z"/><path d="M50 50 L12 50 A38 38 0 0 1 24 26 Z"/></g><circle cx="50" cy="50" r="8" fill="#f57c00"/></svg><span class="cnt" id="fanCnt">3</span></button><div class="btnLabel">シャッフル</div></div>
+  </div>
 </div>
 
 <div id="result">
@@ -162,7 +190,7 @@
 <button id="bgmBtn" title="BGM">🎵</button>
 <div id="verTag"></div>
 <script>
-  document.getElementById('verTag').textContent = 'Tsum v8';
+  document.getElementById('verTag').textContent = 'Tsum v9';
   // ---------------- player identity (browser build: local id) ----------------
   let PLAYER = null;
   try {
@@ -360,6 +388,8 @@
   let cell = 50, grid = [], chain = [], dragging = false, animating = false;
   let playing = false, score = 0, coinsGain = 0, combo = 0, lastPopAt = 0, timeLeft = GAME_SEC, timerId = null;
   let feverGauge = 0, feverUntil = 0, bombPending = null;
+  let skillGauge = 0, fanLeft = 3, paused = false;
+  const SKILL_NEED = 15, FAN_MAX = 3;
   const inFever = () => Date.now() < feverUntil;
 
   const rndType = () => Math.floor(Math.random() * BOMB); // normal types only (0..4)
@@ -493,23 +523,16 @@
     popSound(n);
     if (n >= BOMB_CHAIN && bombPending === null) bombPending = tail.col;
     addFever(n);
+    chargeSkill(chain);
     const popped = chain.slice();
     clearChain();
     removePieces(popped);
   }
-  function explodeBomb(b) {
-    if (animating) return;
-    const hit = new Map(), queue = [b];
-    while (queue.length) {
-      const cur = queue.pop();
-      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-        const r = cur.row + dr, c = cur.col + dc;
-        if (r < 0 || r >= ROWS || c < 0 || c >= COLS) continue;
-        const p = grid[r][c];
-        if (p && !hit.has(p)) { hit.set(p, true); if (p.type === BOMB && p !== b) queue.push(p); }
-      }
-    }
-    const popped = [...hit.keys()];
+  function chargeSkill(popped) {
+    const y = popped.filter(p => p.type === 0).length;
+    if (y) { skillGauge = Math.min(SKILL_NEED, skillGauge + y); skillUi(); }
+  }
+  function scorePop(popped, origin) {
     const now = Date.now();
     combo = (now - lastPopAt <= 2500) ? combo + 1 : 1;
     lastPopAt = now;
@@ -517,13 +540,70 @@
     const gain = Math.round(popped.length * 10 * mult);
     score += gain; coinsGain += popped.length;
     updateHud();
-    floatScore(b, '+' + gain);
+    floatScore(origin, '+' + gain);
     addFever(popped.length);
-    blip(180, .25, 'sawtooth', .16); popSound(popped.length);
+    chargeSkill(popped);
     removePieces(popped);
   }
+  function expandBombs(hit) {
+    const queue = [...hit.keys()].filter(p => p.type === BOMB);
+    while (queue.length) {
+      const cur = queue.pop();
+      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+        const r = cur.row + dr, c = cur.col + dc;
+        if (r < 0 || r >= ROWS || c < 0 || c >= COLS) continue;
+        const p = grid[r][c];
+        if (p && !hit.has(p)) { hit.set(p, true); if (p.type === BOMB) queue.push(p); }
+      }
+    }
+    return [...hit.keys()];
+  }
+  function explodeBomb(b) {
+    if (animating || paused) return;
+    const hit = new Map([[b, true]]);
+    const popped = expandBombs(hit);
+    blip(180, .25, 'sawtooth', .16); popSound(popped.length);
+    scorePop(popped, b);
+  }
+  function skillUi() {
+    const btn = document.getElementById('skillBtn');
+    const deg = Math.round(skillGauge / SKILL_NEED * 360);
+    btn.style.background = 'conic-gradient(#ffd93b ' + deg + 'deg, #fff8e1 ' + deg + 'deg)';
+    btn.classList.toggle('ready', skillGauge >= SKILL_NEED);
+    btn.disabled = !(playing && !paused && skillGauge >= SKILL_NEED);
+  }
+  function fireSkill() {
+    if (!playing || paused || animating || skillGauge < SKILL_NEED) return;
+    skillGauge = 0; skillUi();
+    const cr = 2 + Math.floor(Math.random() * (ROWS - 4)), cc = 2 + Math.floor(Math.random() * (COLS - 4));
+    const hit = new Map();
+    for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) {
+      if (dr * dr + dc * dc > 5) continue;
+      const p = grid[cr + dr] && grid[cr + dr][cc + dc];
+      if (p) hit.set(p, true);
+    }
+    const popped = expandBombs(hit);
+    blip(240, .3, 'sawtooth', .15); popSound(popped.length);
+    scorePop(popped, grid[cr][cc] || popped[0]);
+  }
+  function fanUi() {
+    document.getElementById('fanCnt').textContent = fanLeft;
+    document.getElementById('fanBtn').disabled = !(playing && !paused && fanLeft > 0);
+  }
+  function useFan() {
+    if (!playing || paused || animating || fanLeft <= 0) return;
+    fanLeft--; fanUi();
+    const pieces = grid.flat().filter(p => p && p.type !== BOMB);
+    const types = pieces.map(p => p.type);
+    for (let i = types.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [types[i], types[j]] = [types[j], types[i]]; }
+    pieces.forEach((p, i) => { p.type = types[i]; stylePiece(p); p.el.firstChild.style.transform = 'rotate(' + Math.round(Math.random() * 56 - 28) + 'deg)'; });
+    blip(500, .15, 'sine', .1); setTimeout(() => blip(700, .15, 'sine', .1), 80);
+  }
+  document.getElementById('skillBtn').addEventListener('click', () => { clickSound(); fireSkill(); });
+  document.getElementById('fanBtn').addEventListener('click', () => { clickSound(); useFan(); });
+  document.getElementById('skillIn').innerHTML = TYPES[0].svg;
   field.addEventListener('pointerdown', e => {
-    if (!playing || animating) return;
+    if (!playing || animating || paused) return;
     ac();
     const p = pieceAtEvent(e); if (!p) return;
     if (p.type === BOMB) { explodeBomb(p); e.preventDefault(); return; }
@@ -567,29 +647,44 @@
     save.hearts--; persistServer();
     score = 0; coinsGain = 0; combo = 0; lastPopAt = 0; timeLeft = GAME_SEC;
     feverGauge = 0; feverUntil = 0; bombPending = null; field.classList.remove('fever');
-    updateHud();
+    skillGauge = 0; fanLeft = FAN_MAX; paused = false;
+    document.getElementById('pauseOverlay').classList.remove('on');
+    document.getElementById('pauseBtn').textContent = '⏸';
+    updateHud(); skillUi(); fanUi();
     document.getElementById('result').classList.remove('on');
     document.body.classList.add('inGame');
     showScreen('gameScreen');
     playing = true;
     newBoard();
     clearInterval(timerId);
-    timerId = setInterval(() => {
-      timeLeft = Math.max(0, timeLeft - 0.1);
-      document.getElementById('timeSec').textContent = Math.ceil(timeLeft);
-      const bar = document.getElementById('timeBar');
-      bar.style.width = (timeLeft / GAME_SEC * 100) + '%';
-      bar.classList.toggle('low', timeLeft <= 10);
-      if (!inFever() && feverUntil !== 0) { feverGauge = 0; feverUntil = 0; field.classList.remove('fever'); }
-      const fb = document.getElementById('feverBar');
-      if (inFever()) { fb.style.width = Math.max(0, (feverUntil - Date.now()) / FEVER_MS * 100) + '%'; fb.classList.add('hot'); }
-      else { fb.style.width = (feverGauge / FEVER_NEED * 100) + '%'; fb.classList.remove('hot'); }
-      if (timeLeft <= 0) endGame();
-    }, 100);
+    timerId = setInterval(tick, 100);
     blip(660, .1, 'triangle', .1); setTimeout(() => blip(880, .12, 'triangle', .1), 90);
   }
+  function tick() {
+    timeLeft = Math.max(0, timeLeft - 0.1);
+    document.getElementById('timeSec').textContent = Math.ceil(timeLeft);
+    const bar = document.getElementById('timeBar');
+    bar.style.width = (timeLeft / GAME_SEC * 100) + '%';
+    bar.classList.toggle('low', timeLeft <= 10);
+    if (!inFever() && feverUntil !== 0) { feverGauge = 0; feverUntil = 0; field.classList.remove('fever'); }
+    const fb = document.getElementById('feverBar');
+    if (inFever()) { fb.style.width = Math.max(0, (feverUntil - Date.now()) / FEVER_MS * 100) + '%'; fb.classList.add('hot'); }
+    else { fb.style.width = (feverGauge / FEVER_NEED * 100) + '%'; fb.classList.remove('hot'); }
+    if (timeLeft <= 0) endGame();
+  }
+  function togglePause() {
+    if (!playing) return;
+    paused = !paused;
+    document.getElementById('pauseOverlay').classList.toggle('on', paused);
+    document.getElementById('pauseBtn').textContent = paused ? '▶' : '⏸';
+    if (paused) { clearInterval(timerId); clearChain(); dragging = false; }
+    else { clearInterval(timerId); timerId = setInterval(tick, 100); }
+    skillUi(); fanUi();
+  }
+  document.getElementById('pauseBtn').addEventListener('click', () => { clickSound(); togglePause(); });
   function endGame() {
     playing = false; clearInterval(timerId); clearChain(); field.classList.remove('fever');
+    paused = false; document.getElementById('pauseOverlay').classList.remove('on'); skillUi(); fanUi();
     const isBest = score > save.best;
     if (isBest) save.best = score;
     save.coins += coinsGain;
@@ -616,6 +711,9 @@
     grid: () => grid.map(r => r.map(p => p.type)),
     bombAt: () => { for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (grid[r][c] && grid[r][c].type === BOMB) return [r, c]; return null; },
     setGauge: v => { feverGauge = v; },
+    skill: () => ({ gauge: skillGauge, fan: fanLeft, paused }),
+    setSkill: v => { skillGauge = v; skillUi(); },
+    fireSkill, useFan, togglePause,
     center: (r, c) => { const rect = field.getBoundingClientRect(); return { x: rect.left + (c + .5) * cell, y: rect.top + (r + .5) * cell }; }
   };
 </script>
