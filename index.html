@@ -192,7 +192,7 @@
 <button id="bgmBtn" title="BGM">🎵</button>
 <div id="verTag"></div>
 <script>
-  document.getElementById('verTag').textContent = 'Tsum v18';
+  document.getElementById('verTag').textContent = 'Tsum v19';
   // ---------------- player identity (browser build: local id) ----------------
   let PLAYER = null;
   try {
@@ -438,14 +438,28 @@
     for (let r = 0; r < ROWS; r++) { grid.push([]); for (let c = 0; c < COLS; c++) { const p = makePiece(rndType()); p.row = r; p.col = c; grid[r].push(p); field.appendChild(p.el); } }
     layout();
   }
+  function pieceAtXY(x, y) {
+    let best = null, bd = 1e9;
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      const p = grid[r][c]; if (!p) continue;
+      const d = Math.hypot(x - (c + .5) * cell, y - (r + .5) * cell);
+      if (d < bd) { bd = d; best = p; }
+    }
+    return bd <= cell * 0.78 ? best : null;
+  }
   function pieceAtEvent(e) {
     const rect = field.getBoundingClientRect();
-    const x = e.clientX - rect.left, y = e.clientY - rect.top;
-    const c = Math.floor(x / cell), r = Math.floor(y / cell);
-    if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return null;
-    const cx = (c + .5) * cell, cy = (r + .5) * cell;
-    if (Math.hypot(x - cx, y - cy) > cell * 0.55) return null;
-    return grid[r][c];
+    return pieceAtXY(e.clientX - rect.left, e.clientY - rect.top);
+  }
+  let lastPX = 0, lastPY = 0;
+  function tryExtend(x, y) {
+    const p = pieceAtXY(x, y); if (!p) return;
+    const tail = chain[chain.length - 1];
+    if (p === tail) return;
+    if (chain.length >= 2 && p === chain[chain.length - 2]) { chain.pop(); markSel(); drawChain(); return; }
+    if (p.type !== chain[0].type || chain.includes(p)) return;
+    if (Math.abs(p.row - tail.row) > 1 || Math.abs(p.col - tail.col) > 1) return;
+    chain.push(p); markSel(); drawChain(); blip(500 + chain.length * 30, .05, 'sine', .05);
   }
   const center = p => ({ x: (p.col + .5) * cell, y: (p.row + .5) * cell });
   function drawChain() {
@@ -616,6 +630,7 @@
     const p = pieceAtEvent(e); if (!p) return;
     if (p.type === BOMB) { explodeBomb(p); e.preventDefault(); return; }
     dragging = true; chain = [p]; markSel(); drawChain();
+    { const rect = field.getBoundingClientRect(); lastPX = e.clientX - rect.left; lastPY = e.clientY - rect.top; }
     dragHand.style.display = 'block'; moveHand(e);
     try { field.setPointerCapture(e.pointerId); } catch (err) { }
     e.preventDefault();
@@ -623,13 +638,12 @@
   field.addEventListener('pointermove', e => {
     if (!dragging || !chain.length) return;
     moveHand(e);
-    const p = pieceAtEvent(e); if (!p) return;
-    const tail = chain[chain.length - 1];
-    if (p === tail) return;
-    if (chain.length >= 2 && p === chain[chain.length - 2]) { chain.pop(); markSel(); drawChain(); return; }
-    if (p.type !== chain[0].type || chain.includes(p)) return;
-    if (Math.abs(p.row - tail.row) > 1 || Math.abs(p.col - tail.col) > 1) return;
-    chain.push(p); markSel(); drawChain(); blip(500 + chain.length * 30, .05, 'sine', .05);
+    const rect = field.getBoundingClientRect();
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    const dist = Math.hypot(x - lastPX, y - lastPY);
+    const steps = Math.max(1, Math.min(24, Math.floor(dist / (cell * 0.3))));
+    for (let i = 1; i <= steps; i++) tryExtend(lastPX + (x - lastPX) * i / steps, lastPY + (y - lastPY) * i / steps);
+    lastPX = x; lastPY = y;
   });
   function endDrag() { if (!dragging) return; dragging = false; if (chain.length >= 3) popChain(); else clearChain(); }
   field.addEventListener('pointerup', endDrag);
