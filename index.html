@@ -42,7 +42,18 @@
   #hud { width: min(94vw, 430px); display: flex; flex-direction: column; gap: 4px; }
   #hudRow { display: flex; justify-content: space-between; align-items: baseline; font-weight: 800; }
   #scoreBox { font-size: 24px; color: #e75480; }
-  #comboBox { font-size: 16px; color: #f39c12; min-width: 90px; text-align: right; }
+  #comboBox { font-size: 15px; color: #f39c12; font-weight: 800; min-height: 1.1em; }
+  #coinBox { font-size: 19px; color: #b8860b; }
+  #timeSec { background: #fff; border: 3px solid #7ec8f7; color: #1c6ea4; border-radius: 50%;
+             width: 46px; height: 46px; display: flex; align-items: center; justify-content: center;
+             font-size: 19px; box-shadow: 0 2px 6px rgba(60,120,180,.25); }
+  #feverRow { display: flex; align-items: center; gap: 8px; }
+  #feverLabel { font-size: 12px; font-weight: 800; color: #c2185b; letter-spacing: .08em; }
+  #feverWrap { flex: 1; height: 10px; border-radius: 999px; background: rgba(255,255,255,.7);
+               border: 2px solid rgba(194,24,91,.3); overflow: hidden; }
+  #feverBar { height: 100%; width: 0%; background: linear-gradient(90deg, #ffb3c8, #e75480); }
+  #feverBar.hot { background: linear-gradient(90deg, #ffd54f, #ff7043); }
+  #field.fever { border-color: #ffb300; box-shadow: 0 0 22px 4px rgba(255,179,0,.65); }
   #timeBarWrap { height: 12px; border-radius: 999px; background: rgba(255,255,255,.7);
                  border: 2px solid rgba(231,84,128,.3); overflow: hidden; }
   #timeBar { height: 100%; width: 100%; background: linear-gradient(90deg, #ff8aab, #e75480); border-radius: 999px; }
@@ -106,9 +117,14 @@
     <div id="hudRow">
       <div id="scoreBox">0</div>
       <div id="timeSec">60</div>
-      <div id="comboBox"></div>
+      <div id="coinBox">🪙 0</div>
     </div>
     <div id="timeBarWrap"><div id="timeBar"></div></div>
+    <div id="feverRow">
+      <div id="feverLabel">FEVER</div>
+      <div id="feverWrap"><div id="feverBar"></div></div>
+      <div id="comboBox"></div>
+    </div>
   </div>
   <div id="fieldWrap"><div id="field"><canvas id="chainCanvas"></canvas></div></div>
   <p class="note">ゆびでなぞって、はなすと消えます</p>
@@ -126,7 +142,7 @@
 </div>
 <div id="verTag"></div>
 <script>
-  document.getElementById('verTag').textContent = 'Tsum v3';
+  document.getElementById('verTag').textContent = 'Tsum v4';
   // ---------------- player identity (browser build: local id) ----------------
   let PLAYER = null;
   try {
@@ -270,36 +286,52 @@
 </script>
 <script>
   // ---------------- game ----------------
-  const COLS = 7, ROWS = 8, GAME_SEC = 60;
+  const COLS = 9, ROWS = 11, GAME_SEC = 60;
+  const BOMB = 5, FEVER_NEED = 25, FEVER_MS = 10000, BOMB_CHAIN = 7;
   const TYPES = [
     { e: '🐰', c: ['#ffe3ee', '#ff9ec4'] },
     { e: '🐻', c: ['#ffedbe', '#ffc94d'] },
     { e: '🐸', c: ['#dcf7c9', '#8edb74'] },
     { e: '🐥', c: ['#fff6bf', '#ffd43b'] },
-    { e: '🐨', c: ['#dcefff', '#9ec8f5'] }
+    { e: '🐨', c: ['#dcefff', '#9ec8f5'] },
+    { e: '★', c: ['#e8fdff', '#38b6c9'] }
   ];
   const field = document.getElementById('field');
   const canvas = document.getElementById('chainCanvas');
   const ctx = canvas.getContext('2d');
   let cell = 50, grid = [], chain = [], dragging = false, animating = false;
   let playing = false, score = 0, coinsGain = 0, combo = 0, lastPopAt = 0, timeLeft = GAME_SEC, timerId = null;
+  let feverGauge = 0, feverUntil = 0, bombPending = null;
+  const inFever = () => Date.now() < feverUntil;
 
-  const rndType = () => Math.floor(Math.random() * TYPES.length);
+  const rndType = () => Math.floor(Math.random() * BOMB); // normal types only (0..4)
+  function stylePiece(p) {
+    const t = TYPES[p.type];
+    p.el.style.background = p.type === BOMB
+      ? 'radial-gradient(circle at 35% 30%, #ffffff, ' + t.c[0] + ' 45%, ' + t.c[1] + ')'
+      : 'radial-gradient(circle at 35% 30%, ' + t.c[0] + ', ' + t.c[1] + ')';
+    p.el.firstChild.textContent = t.e;
+    p.el.firstChild.style.color = p.type === BOMB ? '#ffffff' : '';
+    p.el.firstChild.style.textShadow = p.type === BOMB ? '0 1px 3px rgba(0,80,100,.5)' : '';
+    p.el.style.boxShadow = p.type === BOMB
+      ? 'inset -3px -5px 0 rgba(0,60,80,.15), 0 0 10px 2px rgba(56,182,201,.55)'
+      : 'inset -3px -5px 0 rgba(0,0,0,.08), 0 2px 3px rgba(120,40,80,.18)';
+  }
   function makePiece(type) {
     const el = document.createElement('div');
     el.className = 'tsum';
-    const t = TYPES[type];
-    el.style.background = 'radial-gradient(circle at 35% 30%, ' + t.c[0] + ', ' + t.c[1] + ')';
     const f = document.createElement('span');
-    f.className = 'face'; f.textContent = t.e;
+    f.className = 'face';
     el.appendChild(f);
-    return { type, el, row: 0, col: 0 };
+    const p = { type, el, row: 0, col: 0 };
+    stylePiece(p);
+    return p;
   }
   function place(p, animate) {
-    p.el.style.width = cell + 'px'; p.el.style.height = cell + 'px';
-    p.el.firstChild.style.fontSize = (cell * 0.58) + 'px';
-    p.el.style.transform = 'translate(' + (p.col * cell + 2) + 'px,' + (p.row * cell + 2) + 'px)';
-    p.el.style.width = (cell - 4) + 'px'; p.el.style.height = (cell - 4) + 'px';
+    const size = cell * 1.14, off = -cell * 0.07;
+    p.el.style.width = size + 'px'; p.el.style.height = size + 'px';
+    p.el.firstChild.style.fontSize = (size * 0.56) + 'px';
+    p.el.style.transform = 'translate(' + (p.col * cell + off) + 'px,' + (p.row * cell + off) + 'px)';
   }
   function layout() {
     cell = field.clientWidth / COLS;
@@ -341,39 +373,92 @@
     d.style.left = (pt.x - 14) + 'px'; d.style.top = (pt.y - 16) + 'px';
     field.appendChild(d); setTimeout(() => d.remove(), 850);
   }
+  function updateHud() {
+    document.getElementById('scoreBox').textContent = score.toLocaleString();
+    document.getElementById('coinBox').textContent = '🪙 ' + (save.coins + coinsGain).toLocaleString();
+    document.getElementById('comboBox').textContent = combo > 1 ? combo + ' コンボ!' : '';
+  }
+  function addFever(n) {
+    if (inFever()) return;
+    feverGauge = Math.min(FEVER_NEED, feverGauge + n);
+    if (feverGauge >= FEVER_NEED) {
+      feverUntil = Date.now() + FEVER_MS;
+      field.classList.add('fever');
+      const mid = grid[Math.floor(ROWS / 2)] && grid[Math.floor(ROWS / 2)][Math.floor(COLS / 2)];
+      if (mid) floatScore(mid, 'FEVER!');
+      blip(784, .12, 'triangle', .13); setTimeout(() => blip(988, .12, 'triangle', .13), 90); setTimeout(() => blip(1175, .2, 'triangle', .13), 180);
+    }
+  }
+  function settle() {
+    const spawned = [];
+    for (let c = 0; c < COLS; c++) {
+      const surv = [];
+      for (let r = ROWS - 1; r >= 0; r--) if (grid[r][c]) surv.push(grid[r][c]);
+      let write = ROWS - 1;
+      surv.forEach(p => { grid[write][c] = p; p.row = write; p.col = c; write--; });
+      for (let r = write; r >= 0; r--) { const p = makePiece(rndType()); p.row = r; p.col = c; p.el.classList.add('spawn'); grid[r][c] = p; field.appendChild(p.el); spawned.push(p); }
+      for (let r = 0; r < ROWS; r++) place(grid[r][c]);
+    }
+    if (bombPending !== null) {
+      const cand = spawned.filter(p => p.col === bombPending);
+      const t = (cand.length ? cand : spawned)[0];
+      if (t) { t.type = BOMB; stylePiece(t); place(t); }
+      bombPending = null;
+    }
+    animating = false;
+  }
+  function removePieces(popped) {
+    animating = true;
+    popped.forEach(p => { p.el.classList.add('pop'); p.el.style.transform += ' scale(.2)'; if (grid[p.row][p.col] === p) grid[p.row][p.col] = null; });
+    setTimeout(() => { popped.forEach(p => p.el.remove()); settle(); }, 150);
+  }
   function popChain() {
     const n = chain.length, tail = chain[n - 1];
     const now = Date.now();
     combo = (now - lastPopAt <= 2500) ? combo + 1 : 1;
     lastPopAt = now;
-    const mult = Math.min(3, 1 + (combo - 1) * 0.2);
+    const mult = Math.min(3, 1 + (combo - 1) * 0.2) * (inFever() ? 2 : 1);
     const gain = Math.round((n * 10 + (n - 3) * (n - 3) * 5) * mult);
     score += gain; coinsGain += n;
-    document.getElementById('scoreBox').textContent = score.toLocaleString();
-    document.getElementById('comboBox').textContent = combo > 1 ? combo + ' コンボ!' : '';
+    updateHud();
     floatScore(tail, '+' + gain);
     popSound(n);
-    animating = true;
+    if (n >= BOMB_CHAIN && bombPending === null) bombPending = tail.col;
+    addFever(n);
     const popped = chain.slice();
     clearChain();
-    popped.forEach(p => { p.el.classList.add('pop'); p.el.style.transform += ' scale(.2)'; grid[p.row][p.col] = null; });
-    setTimeout(() => {
-      popped.forEach(p => p.el.remove());
-      for (let c = 0; c < COLS; c++) {
-        const surv = [];
-        for (let r = ROWS - 1; r >= 0; r--) if (grid[r][c]) surv.push(grid[r][c]);
-        let write = ROWS - 1;
-        surv.forEach(p => { grid[write][c] = p; p.row = write; p.col = c; write--; });
-        for (let r = write; r >= 0; r--) { const p = makePiece(rndType()); p.row = r; p.col = c; p.el.classList.add('spawn'); grid[r][c] = p; field.appendChild(p.el); }
-        for (let r = 0; r < ROWS; r++) place(grid[r][c]);
+    removePieces(popped);
+  }
+  function explodeBomb(b) {
+    if (animating) return;
+    const hit = new Map(), queue = [b];
+    while (queue.length) {
+      const cur = queue.pop();
+      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+        const r = cur.row + dr, c = cur.col + dc;
+        if (r < 0 || r >= ROWS || c < 0 || c >= COLS) continue;
+        const p = grid[r][c];
+        if (p && !hit.has(p)) { hit.set(p, true); if (p.type === BOMB && p !== b) queue.push(p); }
       }
-      animating = false;
-    }, 150);
+    }
+    const popped = [...hit.keys()];
+    const now = Date.now();
+    combo = (now - lastPopAt <= 2500) ? combo + 1 : 1;
+    lastPopAt = now;
+    const mult = Math.min(3, 1 + (combo - 1) * 0.2) * (inFever() ? 2 : 1);
+    const gain = Math.round(popped.length * 10 * mult);
+    score += gain; coinsGain += popped.length;
+    updateHud();
+    floatScore(b, '+' + gain);
+    addFever(popped.length);
+    blip(180, .25, 'sawtooth', .16); popSound(popped.length);
+    removePieces(popped);
   }
   field.addEventListener('pointerdown', e => {
     if (!playing || animating) return;
     ac();
     const p = pieceAtEvent(e); if (!p) return;
+    if (p.type === BOMB) { explodeBomb(p); e.preventDefault(); return; }
     dragging = true; chain = [p]; markSel(); drawChain();
     try { field.setPointerCapture(e.pointerId); } catch (err) { }
     e.preventDefault();
@@ -413,8 +498,8 @@
     if (save.hearts >= HEART_MAX) save.heartTs = Date.now();
     save.hearts--; persistServer();
     score = 0; coinsGain = 0; combo = 0; lastPopAt = 0; timeLeft = GAME_SEC;
-    document.getElementById('scoreBox').textContent = '0';
-    document.getElementById('comboBox').textContent = '';
+    feverGauge = 0; feverUntil = 0; bombPending = null; field.classList.remove('fever');
+    updateHud();
     document.getElementById('result').classList.remove('on');
     showScreen('gameScreen');
     playing = true;
@@ -426,12 +511,16 @@
       const bar = document.getElementById('timeBar');
       bar.style.width = (timeLeft / GAME_SEC * 100) + '%';
       bar.classList.toggle('low', timeLeft <= 10);
+      if (!inFever() && feverUntil !== 0) { feverGauge = 0; feverUntil = 0; field.classList.remove('fever'); }
+      const fb = document.getElementById('feverBar');
+      if (inFever()) { fb.style.width = Math.max(0, (feverUntil - Date.now()) / FEVER_MS * 100) + '%'; fb.classList.add('hot'); }
+      else { fb.style.width = (feverGauge / FEVER_NEED * 100) + '%'; fb.classList.remove('hot'); }
       if (timeLeft <= 0) endGame();
     }, 100);
     blip(660, .1, 'triangle', .1); setTimeout(() => blip(880, .12, 'triangle', .1), 90);
   }
   function endGame() {
-    playing = false; clearInterval(timerId); clearChain();
+    playing = false; clearInterval(timerId); clearChain(); field.classList.remove('fever');
     const isBest = score > save.best;
     if (isBest) save.best = score;
     save.coins += coinsGain;
@@ -454,8 +543,10 @@
   // test hooks
   window.__tsum = {
     start: startGame,
-    state: () => ({ score, coinsGain, playing, hearts: save.hearts, pieces: document.querySelectorAll('.tsum').length }),
+    state: () => ({ score, coinsGain, playing, hearts: save.hearts, pieces: document.querySelectorAll('.tsum').length, fever: inFever(), gauge: feverGauge, bombs: grid.flat().filter(p => p && p.type === BOMB).length }),
     grid: () => grid.map(r => r.map(p => p.type)),
+    bombAt: () => { for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (grid[r][c] && grid[r][c].type === BOMB) return [r, c]; return null; },
+    setGauge: v => { feverGauge = v; },
     center: (r, c) => { const rect = field.getBoundingClientRect(); return { x: rect.left + (c + .5) * cell, y: rect.top + (r + .5) * cell }; }
   };
 </script>
