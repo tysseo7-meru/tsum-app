@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>ツムツム</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", sans-serif;
+    background: linear-gradient(180deg, #ffd9e8 0%, #ffeef6 55%, #d9f2ff 100%);
+    color: #4a2436; display: flex; flex-direction: column; align-items: center;
+  }
+  #verTag { position: fixed; bottom: 8px; left: 50%; transform: translateX(-50%); z-index: 5;
+            font-size: 11px; color: rgba(74,36,54,.55); }
+  .screen { flex: 1; width: 100%; max-width: 480px; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 16px; padding: 20px; text-align: center; }
+  .icon { width: 148px; height: 148px; border-radius: 32px; box-shadow: 0 8px 24px rgba(190,60,120,.25); }
+  h1 { font-size: 40px; font-weight: 800; letter-spacing: .04em; color: #e75480;
+       text-shadow: 0 2px 0 #fff; }
+  .sub { font-size: 15px; color: #7a4a5e; }
+  #board { width: min(86vw, 360px); aspect-ratio: 1; border-radius: 20px;
+           background: rgba(255,255,255,.55); border: 3px solid rgba(231,84,128,.35);
+           display: grid; grid-template-columns: repeat(6, 1fr); grid-template-rows: repeat(6, 1fr);
+           padding: 10px; gap: 4px; }
+  #board span { border-radius: 50%; opacity: .5; }
+  .btn { font: inherit; font-weight: 700; font-size: 18px; color: #fff; background: #e75480;
+         border: none; border-radius: 999px; padding: 13px 42px; cursor: pointer;
+         box-shadow: 0 4px 0 #b93a63; }
+  .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #b93a63; }
+  .btn:disabled { background: #c9a3b2; box-shadow: 0 4px 0 #a37e8d; cursor: default; }
+  .note { font-size: 13px; color: #96677c; }
+</style>
+</head>
+<body>
+<div class="screen">
+  <img class="icon" src="app-icon-1024.png" alt="">
+  <h1>ツムツム</h1>
+  <p class="sub">なぞってつなげて消すパズル</p>
+  <div id="board" aria-hidden="true"></div>
+  <button class="btn" disabled>準備中</button>
+  <p class="note">ゲーム本体はこれから作ります。いまは入れ物だけです。</p>
+</div>
+<div id="verTag"></div>
+<script>
+  // placeholder board pattern (decorative; game logic comes later)
+  const colors = ['#ffd54f', '#ff8aab', '#81d4fa', '#a5d6a7', '#ce93d8', '#ffab91'];
+  const board = document.getElementById('board');
+  for (let i = 0; i < 36; i++) {
+    const s = document.createElement('span');
+    s.style.background = colors[(i * 7 + ((i / 6) | 0) * 3) % colors.length];
+    board.appendChild(s);
+  }
+  document.getElementById('verTag').textContent = 'Tsum v1';
+</script>
+</body>
+</html>
