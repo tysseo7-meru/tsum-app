@@ -85,6 +85,16 @@
     <div class="prow"><span>ベストスコア</span><span class="val" id="bestVal">0</span></div>
     <div class="prow"><span>コイン</span><span class="val" id="coinVal">0</span></div>
   </div>
+  <div class="panel" id="giftPanel">
+    <div class="prow"><span>受け取り箱 🎁</span><span class="val" id="inboxVal">―</span></div>
+    <button class="btn sub2" id="claimBtn" style="display:none">ハートを受け取る</button>
+    <div class="prow"><span>ハートを送る</span></div>
+    <div style="display:flex; gap:8px;">
+      <input id="giftTo" type="text" placeholder="相手のPiユーザー名" autocomplete="off" style="flex:1; min-width:0; font:inherit; padding:9px 12px; border-radius:999px; border:2px solid rgba(231,84,128,.35);">
+      <button class="btn sub2" id="giftBtn" style="padding:9px 18px;">送る</button>
+    </div>
+    <p class="note" id="giftMsg">送るとコイン+200（1日5回まで）</p>
+  </div>
   <button class="btn" id="startBtn">スタート</button>
   <p id="userLine"></p>
   <p class="note">同じツムを3つ以上なぞってつなげると消えます。<br>プレイごとにハートを1つ使います（15分で1つ回復）。</p>
@@ -115,7 +125,7 @@
 </div>
 <div id="verTag"></div>
 <script>
-  document.getElementById('verTag').textContent = 'Tsum v2';
+  document.getElementById('verTag').textContent = 'Tsum v3';
   // ---------------- player identity (browser build: local id) ----------------
   let PLAYER = null;
   try {
@@ -177,6 +187,7 @@
           save.updated = Math.max(save.updated || 0, d.updated || 0);
           regenHearts(); persistLocal(); renderTitle();
         }
+        checkInbox();
       })
       .catch(() => { /* offline or rules: local save still works */ });
   }
@@ -190,6 +201,70 @@
       payload.best = Math.max(payload.best, cur.best || 0);
       tx.set(userDoc, payload);
     })).catch(() => { });
+  }
+
+  // ---------------- heart gifts ----------------
+  const GIFTS_ENABLED = false; // Pi build: true (recipient lookup needs Pi usernames)
+  const GIFT_COIN_BONUS = 200, GIFT_DAILY_MAX = 5;
+  let inbox = [];
+  function giftMsg(t) { document.getElementById('giftMsg').textContent = t; }
+  function checkInbox() {
+    if (!GIFTS_ENABLED || !fbDb || !PLAYER) return;
+    fbDb.collection('tsumGifts').where('toId', '==', PLAYER.id).where('claimed', '==', false).get()
+      .then(qs => {
+        inbox = qs.docs.map(d => ({ ref: d.ref, from: (d.data() || {}).fromName || '?' }));
+        const iv = document.getElementById('inboxVal');
+        iv.textContent = inbox.length ? 'ハート ' + inbox.length + ' 件' : 'なし';
+        document.getElementById('claimBtn').style.display = inbox.length ? '' : 'none';
+      })
+      .catch(() => { document.getElementById('inboxVal').textContent = '―'; });
+  }
+  function claimGifts() {
+    if (!inbox.length) return;
+    const names = [...new Set(inbox.map(g => g.from))].join('、');
+    const n = inbox.length;
+    const batch = fbDb.batch();
+    inbox.forEach(g => batch.update(g.ref, { claimed: true, claimedAt: Date.now() }));
+    batch.commit().then(() => {
+      save.hearts += n; inbox = []; persistServer(); renderTitle(); checkInbox();
+      giftMsg(names + ' さんからハート' + n + '件を受け取りました');
+      blip(784, .15, 'triangle', .12); setTimeout(() => blip(988, .18, 'triangle', .12), 120);
+    }).catch(() => giftMsg('受け取りに失敗しました。通信を確認してください'));
+  }
+  function giftsLeftToday() {
+    const today = new Date().toDateString();
+    if (save.giftDay !== today) { save.giftDay = today; save.giftCount = 0; }
+    return GIFT_DAILY_MAX - (save.giftCount || 0);
+  }
+  function sendGift() {
+    if (!GIFTS_ENABLED || !fbDb) { giftMsg('ハート送信にはサーバー接続が必要です'); return; }
+    const to = (document.getElementById('giftTo').value || '').trim();
+    if (!to) { giftMsg('相手のPiユーザー名を入れてください'); return; }
+    if (to.toLowerCase() === (PLAYER.name || '').toLowerCase()) { giftMsg('自分には送れません'); return; }
+    if (giftsLeftToday() <= 0) { giftMsg('今日の送信は上限（5回）に達しました'); return; }
+    giftMsg('送信中…');
+    fbDb.collection('tsumUsers').where('name', '==', to).limit(5).get()
+      .then(qs => {
+        const hit = qs.docs.find(d => d.id.indexOf('pi:') === 0);
+        if (!hit) { giftMsg('そのユーザー名はまだ見つかりません（相手が一度プレイすると見つかります）'); return null; }
+        return fbDb.collection('tsumGifts').add({ toId: hit.id, toName: to, fromId: PLAYER.id, fromName: PLAYER.name, ts: Date.now(), claimed: false })
+          .then(() => {
+            save.giftCount = (save.giftCount || 0) + 1;
+            save.coins += GIFT_COIN_BONUS;
+            persistServer(); renderTitle();
+            giftMsg(to + ' さんにハートを送りました（コイン+' + GIFT_COIN_BONUS + '、今日あと' + giftsLeftToday() + '回）');
+            document.getElementById('giftTo').value = '';
+            blip(880, .12, 'triangle', .12);
+          });
+      })
+      .catch(() => giftMsg('送信に失敗しました。通信を確認してください'));
+  }
+  document.getElementById('claimBtn').addEventListener('click', () => { clickSound(); claimGifts(); });
+  document.getElementById('giftBtn').addEventListener('click', () => { clickSound(); sendGift(); });
+  if (!GIFTS_ENABLED) {
+    document.getElementById('giftTo').disabled = true;
+    document.getElementById('giftBtn').disabled = true;
+    giftMsg('ハート送信はPi版で使えます');
   }
 </script>
 <script>
@@ -319,7 +394,9 @@
   function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id)); }
   function renderTitle() {
     regenHearts();
-    document.getElementById('hearts').textContent = '♥'.repeat(save.hearts) + '♡'.repeat(HEART_MAX - save.hearts);
+    document.getElementById('hearts').textContent = save.hearts > HEART_MAX
+      ? '♥'.repeat(HEART_MAX) + '+' + (save.hearts - HEART_MAX)
+      : '♥'.repeat(save.hearts) + '♡'.repeat(HEART_MAX - save.hearts);
     const info = document.getElementById('heartInfo');
     if (save.hearts < HEART_MAX) {
       const ms = Math.max(0, save.heartTs + HEART_REGEN_MS - Date.now());
