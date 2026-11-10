@@ -12,6 +12,7 @@
     font-family: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", sans-serif;
     background: linear-gradient(180deg, #ffd9e8 0%, #ffeef6 55%, #d9f2ff 100%);
     color: #4a2436; display: flex; flex-direction: column; align-items: center;
+    -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
     user-select: none; -webkit-user-select: none;
   }
   #verTag { position: fixed; bottom: 6px; left: 50%; transform: translateX(-50%); z-index: 5;
@@ -23,7 +24,7 @@
   h1 { font-size: 40px; font-weight: 800; letter-spacing: .04em; color: #e75480; text-shadow: 0 2px 0 #fff; }
   .sub { font-size: 15px; color: #7a4a5e; }
   .panel { background: rgba(255,255,255,.65); border: 2px solid rgba(231,84,128,.25); border-radius: 16px;
-           padding: 10px 18px; display: flex; flex-direction: column; gap: 6px; min-width: 250px; }
+           padding: 10px 18px; display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 340px; }
   .prow { display: flex; justify-content: space-between; align-items: center; font-size: 16px; font-weight: 700; }
   .prow .val { color: #e75480; font-size: 18px; }
   #hearts { font-size: 19px; letter-spacing: 2px; }
@@ -90,7 +91,7 @@
     <button class="btn sub2" id="claimBtn" style="display:none">ハートを受け取る</button>
     <div class="prow"><span>ハートを送る</span></div>
     <div style="display:flex; gap:8px;">
-      <input id="giftTo" type="text" placeholder="相手のPiユーザー名" autocomplete="off" style="flex:1; min-width:0; font:inherit; padding:9px 12px; border-radius:999px; border:2px solid rgba(231,84,128,.35);">
+      <input id="giftTo" type="text" placeholder="相手のPiユーザー名" autocomplete="off" style="flex:1; min-width:0; font:inherit; font-size:16px; padding:9px 12px; border-radius:999px; border:2px solid rgba(231,84,128,.35);">
       <button class="btn sub2" id="giftBtn" style="padding:9px 18px;">送る</button>
     </div>
     <p class="note" id="giftMsg">送るとコイン+200（1日5回まで）</p>
