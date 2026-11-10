@@ -153,7 +153,7 @@
   </div>
   <button class="btn" id="startBtn">スタート</button>
   <p id="userLine"></p>
-  <p class="note">同じツムを3つ以上なぞってつなげると消えます。<br>プレイごとにハートを1つ使います（3分で1つ回復）。</p>
+  <p class="note">同じツムを3つ以上なぞってつなげると消えます。<br>プレイごとにハートを1つ使います（15分で1つ回復）。</p>
 </div>
 
 <div class="screen" id="gameScreen">
@@ -192,7 +192,7 @@
 <button id="bgmBtn" title="BGM">🎵</button>
 <div id="verTag"></div>
 <script>
-  document.getElementById('verTag').textContent = 'Tsum v25';
+  document.getElementById('verTag').textContent = 'Tsum v26';
   // ---------------- player identity (browser build: local id) ----------------
   let PLAYER = null;
   try {
@@ -254,7 +254,7 @@
   window.addEventListener('pointerdown', function once() { bgmStart(); window.removeEventListener('pointerdown', once); });
 
   // ---------------- save data: local + Firestore (best never lowered) ----------------
-  const HEART_MAX = 5, HEART_REGEN_MS = 3 * 60 * 1000; // test setting (was 15 min)
+  const HEART_MAX = 5, HEART_REGEN_MS = 15 * 60 * 1000;
   let save = { best: 0, coins: 0, hearts: HEART_MAX, heartTs: Date.now() };
   try { const s = JSON.parse(localStorage.getItem('tsumSaveV1') || 'null'); if (s) save = Object.assign(save, s); } catch (e) { }
   function regenHearts() {
