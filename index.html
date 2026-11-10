@@ -83,7 +83,10 @@
           display: flex; align-items: center; justify-content: center;
           transition: transform .18s ease-in; pointer-events: none;
           box-shadow: inset -3px -5px 0 rgba(0,0,0,.08), 0 2px 3px rgba(120,40,80,.18); }
-  .tsum .face { line-height: 1; }
+  .tsum .face { line-height: 1; width: 84%; height: 84%; display: flex; align-items: center; justify-content: center; }
+  .tsum .face svg { width: 100%; height: 100%; }
+  #bgmBtn { position: fixed; bottom: 12px; right: 12px; z-index: 30; font-size: 20px; width: 44px; height: 44px;
+            border-radius: 50%; border: 2px solid rgba(231,84,128,.35); background: rgba(255,255,255,.85); cursor: pointer; }
   .tsum.sel { z-index: 4; filter: brightness(1.12); outline: 3px solid #fff; }
   .tsum.pop { transition: transform .13s ease-in, opacity .13s ease-in; opacity: 0; }
   .tsum.spawn { animation: spawnIn .18s ease-out; }
@@ -156,9 +159,10 @@
     <button class="btn sub2" id="homeBtn">タイトルへ</button>
   </div>
 </div>
+<button id="bgmBtn" title="BGM">🎵</button>
 <div id="verTag"></div>
 <script>
-  document.getElementById('verTag').textContent = 'Tsum v5';
+  document.getElementById('verTag').textContent = 'Tsum v6';
   // ---------------- player identity (browser build: local id) ----------------
   let PLAYER = null;
   try {
@@ -180,6 +184,44 @@
   }
   function popSound(n) { blip(420 + n * 45, .14, 'triangle', .15); setTimeout(() => blip(630 + n * 45, .12, 'sine', .1), 40); }
   function clickSound() { blip(880, .06, 'square', .06); }
+
+  // ---------------- amusement-park waltz BGM (original melody, synthesized) ----------------
+  let bgmOn = true;
+  try { bgmOn = localStorage.getItem('tsumBgm') !== 'off'; } catch (e) { }
+  let bgmTimer = null, bgmBeat = 0, bgmNextAt = 0;
+  const BEAT = 0.30;
+  const MEL = [76, 79, 84, 83, 79, 76, 81, 79, 76, 74, 0, 0, 76, 77, 79, 81, 79, 76, 77, 76, 74, 72, 0, 0];
+  const ROOT = [48, 48, 43, 43, 48, 53, 43, 48];
+  const mf = m => 440 * Math.pow(2, (m - 69) / 12);
+  function tone(midi, at, dur, type, vol) {
+    const a = ac(); if (!a) return;
+    const o = a.createOscillator(), o2 = a.createOscillator(), g = a.createGain(), g2 = a.createGain();
+    o.type = type; o.frequency.value = mf(midi);
+    o2.type = 'sine'; o2.frequency.value = mf(midi) * 2; g2.gain.value = .35;
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(vol, at + .015);
+    g.gain.exponentialRampToValueAtTime(.0008, at + dur);
+    o.connect(g); o2.connect(g2); g2.connect(g); g.connect(a.destination);
+    o.start(at); o2.start(at); o.stop(at + dur + .05); o2.stop(at + dur + .05);
+  }
+  function bgmTick() {
+    const a = ac(); if (!a) return;
+    while (bgmNextAt < a.currentTime + 0.18) {
+      const b = bgmBeat, bar = Math.floor(b / 3) % 8, beatInBar = b % 3;
+      const m = MEL[b % 24];
+      if (m) tone(m, bgmNextAt, .34, 'triangle', .05);
+      if (beatInBar === 0) tone(ROOT[bar], bgmNextAt, .5, 'sine', .055);
+      else { tone(ROOT[bar] + 7, bgmNextAt, .2, 'triangle', .018); tone(ROOT[bar] + 12, bgmNextAt, .2, 'triangle', .014); }
+      bgmNextAt += BEAT; bgmBeat++;
+    }
+  }
+  function bgmStart() { if (!bgmOn || bgmTimer) return; const a = ac(); if (!a) return; bgmNextAt = a.currentTime + .06; bgmTimer = setInterval(bgmTick, 90); }
+  function bgmStop() { clearInterval(bgmTimer); bgmTimer = null; }
+  const bgmBtn = document.getElementById('bgmBtn');
+  function bgmUi() { bgmBtn.textContent = bgmOn ? '🎵' : '🔇'; }
+  bgmBtn.addEventListener('click', () => { bgmOn = !bgmOn; try { localStorage.setItem('tsumBgm', bgmOn ? 'on' : 'off'); } catch (e) { } bgmUi(); if (bgmOn) bgmStart(); else bgmStop(); });
+  bgmUi();
+  window.addEventListener('pointerdown', function once() { bgmStart(); window.removeEventListener('pointerdown', once); });
 
   // ---------------- save data: local + Firestore (best never lowered) ----------------
   const HEART_MAX = 5, HEART_REGEN_MS = 15 * 60 * 1000;
@@ -305,11 +347,11 @@
   const COLS = 9, ROWS = 11, GAME_SEC = 60;
   const BOMB = 5, FEVER_NEED = 25, FEVER_MS = 10000, BOMB_CHAIN = 7;
   const TYPES = [
-    { e: '🐰', c: ['#ffe3ee', '#ff9ec4'] },
-    { e: '🐻', c: ['#ffedbe', '#ffc94d'] },
-    { e: '🐸', c: ['#dcf7c9', '#8edb74'] },
-    { e: '🐥', c: ['#fff6bf', '#ffd43b'] },
-    { e: '🐨', c: ['#dcefff', '#9ec8f5'] },
+    { c: ['#ffe3ee', '#ff9ec4'], svg: '<svg viewBox="0 0 100 100"><ellipse cx="31" cy="20" rx="9" ry="19" fill="#ffffff" transform="rotate(-11 31 20)"/><ellipse cx="69" cy="20" rx="9" ry="19" fill="#ffffff" transform="rotate(11 69 20)"/><ellipse cx="31" cy="22" rx="4.4" ry="12" fill="#ffb7d1" transform="rotate(-11 31 22)"/><ellipse cx="69" cy="22" rx="4.4" ry="12" fill="#ffb7d1" transform="rotate(11 69 22)"/><circle cx="50" cy="63" r="29" fill="#ffffff"/><circle cx="39" cy="59" r="3.4" fill="#3a2b33"/><circle cx="61" cy="59" r="3.4" fill="#3a2b33"/><circle cx="40.2" cy="57.8" r="1.2" fill="#ffffff"/><circle cx="62.2" cy="57.8" r="1.2" fill="#ffffff"/><ellipse cx="50" cy="66" rx="4" ry="2.8" fill="#ff7fa5"/><path d="M50 69 q-1 4 -6 4 M50 69 q1 4 6 4" stroke="#d77a97" stroke-width="1.8" fill="none" stroke-linecap="round"/><ellipse cx="30" cy="68" rx="5.6" ry="3.4" fill="#ffc4d6" opacity=".8"/><ellipse cx="70" cy="68" rx="5.6" ry="3.4" fill="#ffc4d6" opacity=".8"/></svg>' },
+    { c: ['#ffedbe', '#ffc94d'], svg: '<svg viewBox="0 0 100 100"><circle cx="25" cy="28" r="11" fill="#a9743f"/><circle cx="75" cy="28" r="11" fill="#a9743f"/><circle cx="25" cy="28" r="5.4" fill="#eac9a0"/><circle cx="75" cy="28" r="5.4" fill="#eac9a0"/><circle cx="50" cy="57" r="32" fill="#bd8650"/><circle cx="38" cy="53" r="3.4" fill="#33241a"/><circle cx="62" cy="53" r="3.4" fill="#33241a"/><circle cx="39.2" cy="51.8" r="1.2" fill="#ffffff"/><circle cx="63.2" cy="51.8" r="1.2" fill="#ffffff"/><ellipse cx="50" cy="67" rx="13" ry="10" fill="#f2dcba"/><ellipse cx="50" cy="62" rx="5.2" ry="3.8" fill="#54371f"/><path d="M50 66 v3 M50 69 q-4 4 -8 2 M50 69 q4 4 8 2" stroke="#54371f" stroke-width="2" fill="none" stroke-linecap="round"/><ellipse cx="29" cy="64" rx="5.6" ry="3.4" fill="#ffab91" opacity=".7"/><ellipse cx="71" cy="64" rx="5.6" ry="3.4" fill="#ffab91" opacity=".7"/></svg>' },
+    { c: ['#dcf7c9', '#8edb74'], svg: '<svg viewBox="0 0 100 100"><circle cx="50" cy="58" r="32" fill="#8edb74"/><circle cx="29" cy="33" r="10.5" fill="#8edb74"/><circle cx="71" cy="33" r="10.5" fill="#8edb74"/><circle cx="29" cy="33" r="6.8" fill="#ffffff"/><circle cx="71" cy="33" r="6.8" fill="#ffffff"/><circle cx="29" cy="34" r="3.4" fill="#263238"/><circle cx="71" cy="34" r="3.4" fill="#263238"/><path d="M31 63 Q50 76 69 63" stroke="#2e7d32" stroke-width="2.6" fill="none" stroke-linecap="round"/><ellipse cx="28" cy="62" rx="6" ry="3.6" fill="#ff9eb5" opacity=".8"/><ellipse cx="72" cy="62" rx="6" ry="3.6" fill="#ff9eb5" opacity=".8"/></svg>' },
+    { c: ['#fff6bf', '#ffd43b'], svg: '<svg viewBox="0 0 100 100"><circle cx="50" cy="58" r="31" fill="#ffdf5e"/><path d="M50 28 q-4 -9 -11 -10 M50 28 q0 -10 5 -13 M50 28 q5 -8 11 -9" stroke="#f0a51f" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="38" cy="54" r="3.6" fill="#4a3200"/><circle cx="62" cy="54" r="3.6" fill="#4a3200"/><circle cx="39.3" cy="52.7" r="1.3" fill="#ffffff"/><circle cx="63.3" cy="52.7" r="1.3" fill="#ffffff"/><path d="M41 63 L59 63 L50 73 Z" fill="#ff9f2e"/><ellipse cx="29" cy="65" rx="6" ry="3.6" fill="#ffab91" opacity=".85"/><ellipse cx="71" cy="65" rx="6" ry="3.6" fill="#ffab91" opacity=".85"/></svg>' },
+    { c: ['#dcefff', '#9ec8f5'], svg: '<svg viewBox="0 0 100 100"><circle cx="19" cy="44" r="13" fill="#aebdcf"/><circle cx="81" cy="44" r="13" fill="#aebdcf"/><circle cx="19" cy="44" r="7" fill="#e8eff7"/><circle cx="81" cy="44" r="7" fill="#e8eff7"/><circle cx="50" cy="57" r="31" fill="#ccd9e6"/><circle cx="36" cy="51" r="3.3" fill="#2f3e4d"/><circle cx="64" cy="51" r="3.3" fill="#2f3e4d"/><circle cx="37.2" cy="49.8" r="1.2" fill="#ffffff"/><circle cx="65.2" cy="49.8" r="1.2" fill="#ffffff"/><ellipse cx="50" cy="60" rx="7" ry="10.5" fill="#5f7386"/><ellipse cx="29" cy="65" rx="5.6" ry="3.4" fill="#ffab91" opacity=".7"/><ellipse cx="71" cy="65" rx="5.6" ry="3.4" fill="#ffab91" opacity=".7"/></svg>' },
     { e: '★', c: ['#e8fdff', '#38b6c9'] }
   ];
   const field = document.getElementById('field');
@@ -326,7 +368,7 @@
     p.el.style.background = p.type === BOMB
       ? 'radial-gradient(circle at 35% 30%, #ffffff, ' + t.c[0] + ' 45%, ' + t.c[1] + ')'
       : 'radial-gradient(circle at 35% 30%, ' + t.c[0] + ', ' + t.c[1] + ')';
-    p.el.firstChild.textContent = t.e;
+    if (p.type === BOMB) p.el.firstChild.textContent = '★';
     p.el.firstChild.style.color = p.type === BOMB ? '#ffffff' : '';
     p.el.firstChild.style.textShadow = p.type === BOMB ? '0 1px 3px rgba(0,80,100,.5)' : '';
     p.el.style.boxShadow = p.type === BOMB
@@ -339,6 +381,7 @@
     const f = document.createElement('span');
     f.className = 'face';
     f.style.transform = 'rotate(' + Math.round(Math.random() * 56 - 28) + 'deg)';
+    if (TYPES[type].svg) f.innerHTML = TYPES[type].svg; else f.textContent = TYPES[type].e;
     el.appendChild(f);
     const p = { type, el, row: 0, col: 0 };
     stylePiece(p);
@@ -569,7 +612,7 @@
   // test hooks
   window.__tsum = {
     start: startGame,
-    state: () => ({ score, coinsGain, playing, hearts: save.hearts, pieces: document.querySelectorAll('.tsum').length, fever: inFever(), gauge: feverGauge, bombs: grid.flat().filter(p => p && p.type === BOMB).length }),
+    state: () => ({ score, coinsGain, playing, hearts: save.hearts, pieces: document.querySelectorAll('.tsum').length, fever: inFever(), gauge: feverGauge, bombs: grid.flat().filter(p => p && p.type === BOMB).length, bgm: !!bgmTimer }),
     grid: () => grid.map(r => r.map(p => p.type)),
     bombAt: () => { for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (grid[r][c] && grid[r][c].type === BOMB) return [r, c]; return null; },
     setGauge: v => { feverGauge = v; },
