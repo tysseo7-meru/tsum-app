@@ -62,6 +62,8 @@
   #fanBtn .cnt { position: absolute; bottom: -4px; right: -4px; background: #e75480; color: #fff; font-size: 12px; font-weight: 800;
                  border-radius: 999px; padding: 1px 7px; border: 2px solid #fff; }
   .btnLabel { font-size: 11px; color: #cfc4f5; text-align: center; margin-top: 3px; font-weight: 700; }
+  #dragHand { position: absolute; z-index: 9; width: 92px; height: 92px; pointer-events: none; display: none;
+              filter: drop-shadow(0 3px 4px rgba(0,0,0,.35)); }
   #pauseOverlay { position: absolute; inset: 0; z-index: 8; display: none; align-items: center; justify-content: center;
                   background: rgba(20,10,50,.55); color: #fff; font-size: 24px; font-weight: 800; border-radius: 38px; }
   #pauseOverlay.on { display: flex; }
@@ -169,7 +171,7 @@
       <div id="comboBox"></div>
     </div>
   </div>
-  <div id="fieldWrap"><div id="field"><canvas id="chainCanvas"></canvas><div id="pauseOverlay">⏸ 一時停止中</div></div></div>
+  <div id="fieldWrap"><div id="field"><canvas id="chainCanvas"></canvas><div id="dragHand"><svg viewBox="0 0 100 100"><path d="M51 3 c4.5 0 7.5 3.4 7.5 8.5 V34 c2.8-2.2 5-3.2 7.6-2.6 3.4.8 5 4.4 3.9 8.2 2.9-1.6 6-1.4 8.2.6 2.6 2.4 2.6 6.4.2 9.6 3.2-.4 6.2 1.2 7.4 4.2 1.4 3.4-.2 7.2-2.6 10.6 L70 82.5 c-3.4 4.6-8.4 7-14 7 H48 c-6.5 0-12-2.8-15.6-7.8 L21 66.6 c-2.2-3-2.4-6.8-.4-9.4 1.9-2.5 5.4-3 8.4-1.2 l8.4 5 V11.5 C37.4 6.4 40.4 3 45 3 Z" fill="#ffffff" stroke="#2f2a33" stroke-width="3.5" stroke-linejoin="round"/><path d="M37.5 40 q4 3 8.5 3 M58.5 40 q4 3 8 2.4" stroke="#2f2a33" stroke-width="2.4" fill="none" stroke-linecap="round" opacity=".55"/></svg></div><div id="pauseOverlay">⏸ 一時停止中</div></div></div>
   <div id="underRow">
     <div><button class="roundBtn" id="skillBtn"><span class="in" id="skillIn"></span></button><div class="btnLabel">スキル</div></div>
     <p class="note">ゆびでなぞって、<br>はなすと消えます</p>
@@ -190,7 +192,7 @@
 <button id="bgmBtn" title="BGM">🎵</button>
 <div id="verTag"></div>
 <script>
-  document.getElementById('verTag').textContent = 'Tsum v17';
+  document.getElementById('verTag').textContent = 'Tsum v18';
   // ---------------- player identity (browser build: local id) ----------------
   let PLAYER = null;
   try {
@@ -463,7 +465,13 @@
     });
   }
   function markSel() { grid.flat().forEach(p => p.el.classList.toggle('sel', chain.includes(p))); }
-  function clearChain() { chain = []; markSel(); drawChain(); }
+  const dragHand = document.getElementById('dragHand');
+  function moveHand(e) {
+    const r = field.getBoundingClientRect();
+    dragHand.style.left = (e.clientX - r.left - 44) + 'px';
+    dragHand.style.top = (e.clientY - r.top - 3) + 'px';
+  }
+  function clearChain() { chain = []; markSel(); drawChain(); dragHand.style.display = 'none'; }
   function floatScore(p, text) {
     const d = document.createElement('div');
     d.className = 'floatScore'; d.textContent = text;
@@ -608,11 +616,13 @@
     const p = pieceAtEvent(e); if (!p) return;
     if (p.type === BOMB) { explodeBomb(p); e.preventDefault(); return; }
     dragging = true; chain = [p]; markSel(); drawChain();
+    dragHand.style.display = 'block'; moveHand(e);
     try { field.setPointerCapture(e.pointerId); } catch (err) { }
     e.preventDefault();
   });
   field.addEventListener('pointermove', e => {
     if (!dragging || !chain.length) return;
+    moveHand(e);
     const p = pieceAtEvent(e); if (!p) return;
     const tail = chain[chain.length - 1];
     if (p === tail) return;
