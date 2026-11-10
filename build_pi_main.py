@@ -43,7 +43,7 @@ gate = """
   } else {
     try {
       Pi.init({ version: '2.0', sandbox: PI_SANDBOX });
-      Pi.authenticate(['username'], function (payment) { /* no payments in this app */ })
+      Pi.authenticate(['username', 'wallet_address'], function (payment) { /* no payments in this app */ })
         .then(function (auth) {
           PLAYER = { id: 'pi:' + auth.user.uid, name: auth.user.username };
           gateEl.style.display = 'none';
