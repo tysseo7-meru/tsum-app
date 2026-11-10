@@ -190,7 +190,7 @@
 <button id="bgmBtn" title="BGM">🎵</button>
 <div id="verTag"></div>
 <script>
-  document.getElementById('verTag').textContent = 'Tsum v15';
+  document.getElementById('verTag').textContent = 'Tsum v16';
   // ---------------- player identity (browser build: local id) ----------------
   let PLAYER = null;
   try {
@@ -410,7 +410,7 @@
     el.className = 'tsum';
     const f = document.createElement('span');
     f.className = 'face';
-    f.style.transform = 'rotate(' + Math.round(Math.random() * 56 - 28) + 'deg)';
+    f.style.transform = 'rotate(' + Math.floor(Math.random() * 360) + 'deg)';
     if (TYPES[type].svg) f.innerHTML = TYPES[type].svg; else f.textContent = TYPES[type].e;
     el.appendChild(f);
     const p = { type, el, row: 0, col: 0 };
@@ -596,7 +596,7 @@
     const pieces = grid.flat().filter(p => p && p.type !== BOMB);
     const types = pieces.map(p => p.type);
     for (let i = types.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [types[i], types[j]] = [types[j], types[i]]; }
-    pieces.forEach((p, i) => { p.type = types[i]; stylePiece(p); p.el.firstChild.style.transform = 'rotate(' + Math.round(Math.random() * 56 - 28) + 'deg)'; });
+    pieces.forEach((p, i) => { p.type = types[i]; stylePiece(p); p.el.firstChild.style.transform = 'rotate(' + Math.floor(Math.random() * 360) + 'deg)'; });
     blip(500, .15, 'sine', .1); setTimeout(() => blip(700, .15, 'sine', .1), 80);
   }
   document.getElementById('skillBtn').addEventListener('click', () => { clickSound(); fireSkill(); });
