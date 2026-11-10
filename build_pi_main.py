@@ -24,20 +24,20 @@ s = s.replace("document.getElementById('userLine').textContent = 'プレイヤ�
 s = s.replace('<button class="btn" id="startBtn">スタート</button>', '<button class="btn" id="startBtn" disabled>スタート</button>', 1)
 gate = """
 <style>
-  #pi-gate { position: fixed; inset: 0; z-index: 60; background: rgba(8,28,58,.94); color: #fff;
-             display: none; flex-direction: column; align-items: center; justify-content: center;
+  #pi-gate { position: fixed; inset: 0; z-index: 60; background: #0b2440; color: #fff;
+             display: flex; flex-direction: column; align-items: center; justify-content: center;
              gap: 16px; padding: 24px; text-align: center; font-family: inherit; }
   #pi-gate a { color: #cfe8ff; font-weight: 700; }
 </style>
 <div id="pi-gate">
-  <p>このブラウザではサインインできません。<br>Piブラウザで開いてください。</p>
+  <p id="gateMsg">サインイン中…</p><p id="gateHelp" style="display:none">このブラウザではサインインできません。<br>Piブラウザで開いてください。</p>
   <a id="pinetLink" href="#" style="display:none">PiNetで開く</a>
 </div>
 <script>
   const gateEl = document.getElementById('pi-gate');
   const pinetLink = document.getElementById('pinetLink');
   if (PINET_URL) { pinetLink.href = PINET_URL; pinetLink.style.display = ''; }
-  function showGate() { gateEl.style.display = 'flex'; }
+  function showGate() { document.getElementById('gateMsg').style.display = 'none'; document.getElementById('gateHelp').style.display = ''; }
   if (typeof Pi === 'undefined') {
     showGate();
   } else {
@@ -46,6 +46,7 @@ gate = """
       Pi.authenticate(['username'], function (payment) { /* no payments in this app */ })
         .then(function (auth) {
           PLAYER = { id: 'pi:' + auth.user.uid, name: auth.user.username };
+          gateEl.style.display = 'none';
           document.getElementById('userLine').textContent = 'サインイン済み： ' + PLAYER.name;
           renderTitle();
           startSync();
@@ -53,6 +54,7 @@ gate = """
         .catch(function () { showGate(); });
     } catch (e) { showGate(); }
   }
+  setTimeout(function () { if (!PLAYER) showGate(); }, 9000);
 </script>
 </body>"""
 s = s.replace('</body>', gate, 1)
